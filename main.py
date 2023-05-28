@@ -1,8 +1,13 @@
-import numpy as np
+import tensorflow.keras as keras
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Flatten, Conv2D, Input, MaxPooling2D, Dropout, UpSampling2D, Concatenate
+
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+
 
 
 # Tworzenie sztucznych danych uczących
@@ -32,17 +37,27 @@ def generate_data(num_samples):
     return X_train, y_train
 
 # Generowanie danych uczących
-X_train, y_train = generate_data(5000) #generate_ training_data
+X_train, y_train = generate_data(10000) #generate_ training_data
 X_val, y_val = generate_data(2000) #generate_validation_data
 
 # Tworzenie modelu sieci neuronowej
-model = Sequential()
-model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(64, 64, 1)))
-model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
-model.add(Conv2D(128, kernel_size=(3, 3), activation='relu'))
-model.add(Flatten())
-model.add(Dense(64, activation='relu'))
-model.add(Dense(4))  # 4 wyjścia: x_początek, y_początek, x_koniec, y_koniec
+# model = Sequential()
+# model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(64, 64, 1)))
+# model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
+# model.add(Conv2D(128, kernel_size=(3, 3), activation='relu'))
+# model.add(Flatten())
+# model.add(Dense(64, activation='relu'))
+# model.add(Dense(4))  # 4 wyjścia: x_początek, y_początek, x_koniec, y_koniec
+# Tworzenie modelu
+
+model = keras.models.Sequential([
+    keras.layers.Flatten(input_shape=(64, 64)),  # Spłaszczanie danych do 1D
+    keras.layers.Dense(64, activation='relu'),
+    keras.layers.Dense(64, activation='relu'),
+    keras.layers.Dense(4)  # Wyjściowa warstwa z 4 neuronami (współrzędnymi)
+])
+# przy tym modelu dokładność danych walidacyjnych również rośnie
+# loss = MSE spada --> model się uczy
 
 # Kompilowanie i uczenie modelu
 model.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
@@ -69,10 +84,18 @@ print("y_koniec:", predictions[0][3])
 # Wykresy dokładności i straty
 plt.figure(figsize=(12, 4))
 
-# Dokładność treningu i walidacji
+# Dokładność treningu i walidacji - wykres Accuracy
 plt.plot(history.history['accuracy'], label='Train Accuracy')
 plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.legend()
 plt.show()
+
+# Dokładność treningu i walidacji - wykres mean_squared_error
+# plt.plot(history.history['loss'], label='Train mean_squared_error')
+# plt.plot(history.history['val_loss'], label='Validation mean_squared_error')
+# plt.xlabel('Epochs')
+# plt.ylabel('mean_squared_error')
+# plt.legend()
+# plt.show()
