@@ -1,149 +1,166 @@
-import tensorflow.keras as keras
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Flatten, Conv2D, Input, MaxPooling2D, Dropout, UpSampling2D, Concatenate
-
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from keras import Sequential
+from keras.layers import Conv2D, Flatten, Dense
 from tensorflow import keras
-
-
 from sklearn.model_selection import train_test_split
+
+# ## Test ustawiania współrzędnych
+# coords = np.array([10, 4, 10, 2])
+# corner_1, corner_2 = tuple(coords[:2]), tuple(coords[2:])
+# coords = min(corner_1, corner_2) + max(corner_1, corner_2)
+# print(coords)
 
 # Generowanie unikalnych współrzędnych
 def generate_unique_coordinates(num_samples):
+    np.random.seed(100)
     population = np.arange(64)
     coordinates = []
 
+    #losujemy do póki nie będzie num_samples unikalnych koordynat
     while len(coordinates) < num_samples:
         # Losowanie czterech współrzędnych
-        coords = np.random.choice(population, size=4, replace=False)
-        coords = coords.tolist()
-
+        coords = np.random.choice(population, size=4)
+        # ustawienie współrzędnych parami: najpierw x_początku < x_końca, jeśli ok to ustawione if  x_początku == x_końca
+        # to y_początku < y_końca
+        # wspólrzedne musimy ustawić, w przeciwnym wypadku model sie nie uczy.
+        corner_1, corner_2 = tuple(coords[:2]), tuple(coords[2:])
+        coords = min(corner_1, corner_2) + max(corner_1, corner_2)
+        #zebranie wszystkich koordynat do jednej listy
+        coords = list(coords)
         # Sprawdzenie, czy ta konfiguracja współrzędnych już istnieje
         if coords not in coordinates:
             coordinates.append(coords)
 
     return np.array(coordinates)
 
+
 # Generowanie danych
-coordinates = generate_unique_coordinates(10000)
+
+coordinates = generate_unique_coordinates(50000)
 
 # Podział na dane treningowe i testowe w proporcji 2/8
-train_coordinates, test_coordinates = train_test_split(coordinates, test_size=0.8, random_state=42)
+train_coordinates, test_coordinates = train_test_split(coordinates, test_size=0.2, random_state=42)
+
+# Test --> jaką tablicę otrzymujemy
+# print(train_coordinates.shape)
+# print(test_coordinates.shape)
+
+# Test --> koordynaty pierwszej generowanej losowo tablicy
+# print(train_coordinates[0])
+
+# for i in range(30):
+#     print(train_coordinates[i])
+
+#Tworzenie obrazków
+def generate_img(coordinates):
+    img = Image.new('L', (64, 64), color=0)
+    img_draw = ImageDraw.Draw(img)
+    corner_1, corner_2 = (coordinates[0], coordinates[1]), (coordinates[2], coordinates[3])
+    img_draw.line([corner_1, corner_2], fill=1, width=1)
+    img_array = np.array(img)
+    return img_array
+
+#Funkcja wyświetlania linii na układzie współrzędnych na potrzeby sprawdzenia poprawności wprowadzanych danych
+def show_img(img):
+  plt.imshow(img, interpolation='none')
+  plt.show()
+
+# Test --> czy generowany obraz jest własciwy
+# show_img(generate_img(train_coordinates[0]))
+
+def generate_images(coordinates_list):
+  x = []
+  for coordinates in coordinates_list:
+    img_array = generate_img(coordinates)
+    x.append(img_array)
+  return np.array(x), coordinates_list
+
+x_train, y_train = generate_images(train_coordinates)
+x_test, y_test = generate_images(test_coordinates)
 
 
-print("Dane treningowe:")
-print(train_coordinates)
+#sprawdzenie poprawności rozmiarów tablic danych
+# print(x_train.shape, y_train.shape)
+# print(x_test.shape, y_test.shape)
 
-print("\nDane walidacyjne:")
-print(test_coordinates)
+#sprawdzenie poprawności danych treningowych
+# show_img(x_train[5])
+# print obrazka dla danych 5
+# print(y_train[5])
+# print danych 5
 
-
-# Przygotowanie danych treningowych
-x_train = np.zeros((train_coordinates.shape[0], 64, 64))
-y_train = np.zeros((train_coordinates.shape[0], 4))
-for i, coords in enumerate(train_coordinates):
-    x_train[i, coords[0], coords[1]] = 1
-    x_train[i, coords[2], coords[3]] = 1
-    y_train[i] = coords
-
-# Przygotowanie danych testowych
-x_test = np.zeros((test_coordinates.shape[0], 64, 64))
-y_test = np.zeros((test_coordinates.shape[0], 4))
-for i, coords in enumerate(test_coordinates):
-    x_test[i, coords[0], coords[1]] = 1
-    x_test[i, coords[2], coords[3]] = 1
-    y_test[i] = coords
+#sprawdzenie poprawności danych validacyjnych
+# show_img(x_test[0])
+# print(y_test[0])
 
 
-# Tworzenie sztucznych danych uczących
-# def generate_data(num_samples):
-#     X_train = np.zeros((num_samples, 64, 64, 1))
-#     y_train = np.zeros((num_samples, 4))  # cztery współrzędne: x_początek, y_początek, x_koniec, y_koniec
-#
-#     for i in range(num_samples):
-#         # Generowanie losowej linii na obrazie
-#         x_start = np.random.randint(0, 64)
-#         y_start = np.random.randint(0, 64)
-#         x_end = np.random.randint(0, 64)
-#         y_end = np.random.randint(0, 64)
-#
-#         # Tworzenie obrazu z linią
-#         img = Image.new('L', (64, 64), color=255)
-#         img_draw = ImageDraw.Draw(img)
-#         img_draw.line([(x_start, y_start), (x_end, y_end)], fill=0, width=1)
-#
-#         # Konwersja obrazu do tablicy numpy
-#         img_array = np.array(img)
-#         img_array = img_array.reshape((64, 64, 1))
-#
-#         X_train[i] = img_array
-#         y_train[i] = [x_start, y_start, x_end, y_end]
-#
-#     return X_train, y_train
+## -----------------------"""Model sieci neuronowej"""
 
-# Generowanie danych uczących
-# X_train, y_train = generate_data(10000) #generate_ training_data
-# X_val, y_val = generate_data(2000) #generate_validation_data
-
-# Tworzenie modelu sieci neuronowej
+## --------------------- MODEL W WERSJI Z UŻYCIEM SIECI KONWOLUCYJNYCH --------
+## (zalecane przy problemach zwiazanych z obrazem)
 # model = Sequential()
 # model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(64, 64, 1)))
-# model.add(Conv2D(64, kernel_size=(3, 3), activation='relu'))
-# model.add(Conv2D(128, kernel_size=(3, 3), activation='relu'))
+# # model.add(Conv2D(16, kernel_size=(3, 3), activation='relu'))
 # model.add(Flatten())
-# model.add(Dense(64, activation='relu'))
+# keras.layers.Dropout(0.2),
+# model.add(Dense(32, activation='relu'))
 # model.add(Dense(4))  # 4 wyjścia: x_początek, y_początek, x_koniec, y_koniec
-# Tworzenie modelu
+
+
+## --------------------- MODEL W WERSJI Z UŻYCIEM SIECI KONWOLUCYJNYCH  (szybszy i prostszy ) --------
 
 model = keras.models.Sequential([
     keras.layers.Flatten(input_shape=(64, 64)),  # Spłaszczanie danych do 1D
-    keras.layers.Dense(64, activation='relu'),
-    keras.layers.Dense(64, activation='relu'),
+    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dropout(0.1),
+    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dropout(0.1),
+    keras.layers.Dense(32, activation='relu'),
     keras.layers.Dense(4)  # Wyjściowa warstwa z 4 neuronami (współrzędnymi)
 ])
-# przy tym modelu dokładność danych walidacyjnych również rośnie
-# loss = MSE spada --> model się uczy
 
-# Kompilowanie i uczenie modelu
-model.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
-# Trenowanie modelu
-history = model.fit(x_train, y_train, epochs=20, batch_size=32, validation_data=(x_test, y_test))
+## Kompilopwanie modelu z odpowiednimi metrykami - metryki do podania skuteczności
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mean_squared_error', metrics=['mean_absolute_error'])
 
-# Testowanie modelu na przykładowym obrazie
-sample_image = Image.new('L', (64, 64), color=255)
-sample_image_draw = ImageDraw.Draw(sample_image)
-sample_image_draw.line([(10, 20), (40, 50)], fill=0, width=1)  # symulacja linii na obrazie
+## Trenowanie modelu
+history = model.fit(x_train, y_train, epochs=50, batch_size=32, validation_data=(x_test, y_test))
 
-# Konwersja obrazu do tablicy numpy
-sample_image_array = np.array(sample_image)
-sample_image_array = sample_image_array.reshape((1, 64, 64, 1))
-predictions = model.predict(sample_image_array)
-
-# Wyświetlanie wyników
-print("Przewidziane współrzędne:")
-print("x_początek:", predictions[0][0])
-print("y_początek:", predictions[0][1])
-print("x_koniec:", predictions[0][2])
-print("y_koniec:", predictions[0][3])
-
-# Wykresy dokładności i straty
-plt.figure(figsize=(12, 4))
-
-# Dokładność treningu i walidacji - wykres Accuracy
-plt.plot(history.history['accuracy'], label='Train Accuracy')
-plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+# Dokładność treningu i walidacji - wykres mean_squared_error
+plt.plot(history.history['loss'], label='Train mean_squared_error')
+plt.plot(history.history['val_loss'], label='Validation mean_squared_error')
 plt.xlabel('Epochs')
-plt.ylabel('Accuracy')
+plt.ylabel('mean_squared_error')
 plt.legend()
 plt.show()
 
-# Dokładność treningu i walidacji - wykres mean_squared_error
-# plt.plot(history.history['loss'], label='Train mean_squared_error')
-# plt.plot(history.history['val_loss'], label='Validation mean_squared_error')
-# plt.xlabel('Epochs')
-# plt.ylabel('mean_squared_error')
-# plt.legend()
-# plt.show()
+# Dokładność treningu i walidacji - wykres sredni błąd bezwzględny
+plt.plot(history.history['mean_absolute_error'], label='Train mean absolute error')
+plt.plot(history.history['val_mean_absolute_error'], label='Validation mean absolute error')
+plt.xlabel('Epochs')
+plt.ylabel('Absolute error')
+plt.legend()
+plt.show()
+
+
+## Sprawdzenie wyników predykcji modelu sieci neuronowej
+preds = model.predict(x_test)
+preds_train = model.predict(x_train)
+
+
+# print(y_test[0])
+# print(preds[0])
+# show_img(x_test[0])
+
+
+# print(y_test[100])
+# print(preds[100])
+# show_img(x_test[100])
+
+## Porównanie tabel
+# for i in range(20):
+#   print(y_test[i], preds[i])
+# for i in range(20):
+#   print(y_train[i], preds_train[i])
